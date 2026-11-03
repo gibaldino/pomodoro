@@ -32,7 +32,7 @@ async function done(){beep();navigator.vibrate&&navigator.vibrate([300,150,300])
  set(mode=='foco'?'pausa':'foco')}
 $('go').onclick=start;$('pa').onclick=stop;$('rs').onclick=()=>set(mode);$('mf').onclick=()=>set('foco');$('mp').onclick=()=>set('pausa');
 let EV=[];const tf=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}),df=new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',timeZone:'America/Sao_Paulo'}),dk=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'});
-function showM(){const n=Date.now(),e=EV.find(x=>new Date(x.e)>n);if(!e){$('m').textContent='Nenhuma reunião próxima';return}
+function showM(){const n=Date.now(),e=EV.find(x=>new Date(x.s)>n);if(!e){$('m').textContent='Nenhuma reunião próxima';return}
  const s=new Date(e.s),now=s<=n,day=dk.format(s)==dk.format(n)?'Hoje':df.format(s);const el=$('m');el.textContent=(now?'Agora · ':'Próxima · ')+day+' '+tf.format(s)+' — ';const b=document.createElement('b');b.textContent=e.t;el.append(b)}
 async function load(){try{const r=await fetch('events.json?'+Date.now(),{cache:'no-store'});EV=(await r.json()).events.sort((a,b)=>new Date(a.s)-new Date(b.s))}catch(e){}showM()}
 load();setInterval(load,5*60e3);setInterval(showM,30e3);draw();
