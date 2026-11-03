@@ -13,11 +13,26 @@ body.run #t{color:var(--g)}
 .ctl button.p{background:var(--g);border-color:var(--g);color:#06140b;font-weight:600}
 button:focus-visible{outline:2px solid var(--g);outline-offset:2px}
 #m{color:var(--mute);text-align:center;font-size:.95rem}#m b{color:var(--fg);font-weight:500}
+body{flex-direction:column}
+.main{display:flex;flex-direction:column;align-items:center;gap:2.5rem}
+#cal{width:100%;max-width:760px;height:52vh;overflow-y:auto;border-top:1px solid #222426;scrollbar-width:thin}
+.ch{display:flex;position:sticky;top:0;background:var(--bg);z-index:3;color:var(--mute);font-size:.8rem}
+.ch div{flex:1;padding:.5rem .4rem;border-left:1px solid #222426}.ch .gut{flex:0 0 3.2rem;border:0}
+.ch .td{color:var(--g)}
+.grid{display:flex;position:relative;height:calc(24 * var(--h))}:root{--h:52px}
+.gut{flex:0 0 3.2rem;position:relative}.gut span{position:absolute;right:.5rem;transform:translateY(-50%);font-size:.72rem;color:var(--mute)}
+.col{flex:1;position:relative;border-left:1px solid #222426;background:repeating-linear-gradient(#222426 0 1px,transparent 1px var(--h))}
+.ev{position:absolute;left:2px;right:4px;background:var(--g);color:#06140b;border-radius:5px;padding:2px 6px;font-size:.75rem;line-height:1.25;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500;border:1px solid var(--bg)}
+.ev small{display:block;font-weight:400;opacity:.85}.ev.past{background:#166534;color:#cfe9d6}
+.now{position:absolute;left:-5px;right:0;height:2px;background:#ef4444;z-index:2}.now::before{content:"";position:absolute;left:0;top:-4px;width:10px;height:10px;border-radius:50%;background:#ef4444}
+@media(min-width:1000px){body{flex-direction:row;align-items:stretch;gap:3rem}.main{justify-content:center;flex:0 0 auto}#cal{height:calc(100dvh - 3rem)}}
+@media(max-width:600px){.c2{display:none}#cal{height:45vh}}
 </style></head><body>
-<div class="modes"><button id="mf" class="on">Foco</button><button id="mp">Pausa</button></div>
+<div class="main"><div class="modes"><button id="mf" class="on">Foco</button><button id="mp">Pausa</button></div>
 <div id="t">25:00</div>
 <div class="ctl"><button id="go" class="p">Iniciar</button><button id="pa">Pausar</button><button id="rs">Resetar</button></div>
-<div id="m">Carregando próxima reunião…</div>
+<div id="m">Carregando próxima reunião…</div></div>
+<div id="cal"></div>
 <script>
 const D={foco:25*60,pausa:5*60};let mode='foco',left=D.foco,end=null,iv=null;const $=i=>document.getElementById(i);
 const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
@@ -34,7 +49,23 @@ $('go').onclick=start;$('pa').onclick=stop;$('rs').onclick=()=>set(mode);$('mf')
 let EV=[];const tf=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}),df=new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',timeZone:'America/Sao_Paulo'}),dk=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'});
 function showM(){const n=Date.now(),e=EV.find(x=>new Date(x.s)>n);if(!e){$('m').textContent='Nenhuma reunião próxima';return}
  const s=new Date(e.s),now=s<=n,day=dk.format(s)==dk.format(n)?'Hoje':df.format(s);const el=$('m');el.textContent=(now?'Agora · ':'Próxima · ')+day+' '+tf.format(s)+' — ';const b=document.createElement('b');b.textContent=e.t;el.append(b)}
-async function load(){try{const r=await fetch('events.json?'+Date.now(),{cache:'no-store'});EV=(await r.json()).events.sort((a,b)=>new Date(a.s)-new Date(b.s))}catch(e){}showM()}
-load();setInterval(load,5*60e3);setInterval(showM,30e3);draw();
+
+let scrolled=false;
+function cal(){const n=new Date(),H=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h')),
+ days=[0,1].map(i=>dk.format(new Date(n.getTime()+i*864e5))),
+ hm=d=>{const[h,m]=tf.format(d).split(':').map(Number);return h*60+m},
+ lbl=['Hoje','Amanhã'].map((t,i)=>t+' · '+df.format(new Date(n.getTime()+i*864e5)));
+ let h='<div class="ch"><div class="gut"></div>'+lbl.map((l,i)=>`<div class="${i?'c2':'td'}">${l}</div>`).join('')+'</div><div class="grid"><div class="gut">';
+ for(let i=1;i<24;i++)h+=`<span style="top:${i*H}px">${String(i).padStart(2,'0')}:00</span>`;h+='</div>';
+ days.forEach((d,i)=>{h+=`<div class="col${i?' c2':''}">`;
+  EV.forEach(e=>{const s=new Date(e.s),f=new Date(e.e),sd=dk.format(s),fd=dk.format(new Date(f-1));if(sd>d||fd<d)return;
+   const a=sd<d?0:hm(s),b=fd>d||dk.format(f)>d&&hm(f)==0?1440:hm(f),top=a/60*H,ht=Math.max((b-a)/60*H,18);
+   const el=document.createElement('div');el.className='ev'+(f<n?' past':'');el.style.cssText=`top:${top}px;height:${ht-2}px`;
+   el.title=e.t;el.textContent=e.t;if(ht>34){const sm=document.createElement('small');sm.textContent=tf.format(s)+' – '+tf.format(f);el.append(sm)}
+   h+=el.outerHTML});
+  if(i==0)h+=`<div class="now" style="top:${hm(n)/60*H}px"></div>`;h+='</div>'});
+ const c=$('cal');c.innerHTML=h+'</div>';if(!scrolled){c.scrollTop=Math.max(0,hm(n)/60*H-c.clientHeight/3);scrolled=true}}
+async function load(){try{const r=await fetch('events.json?'+Date.now(),{cache:'no-store'});EV=(await r.json()).events.sort((a,b)=>new Date(a.s)-new Date(b.s))}catch(e){}showM();cal()}
+load();setInterval(load,5*60e3);setInterval(showM,30e3);setInterval(cal,60e3);draw();
 'serviceWorker'in navigator&&navigator.serviceWorker.register('sw.js');
 </script></body></html>
