@@ -1,0 +1,40 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="theme-color" content="#0e0f10"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><title>Pomodoro</title>
+<style>
+:root{--bg:#0e0f10;--fg:#e8e8e8;--mute:#7a7d80;--g:#22c55e}
+@media (prefers-color-scheme:light){:root.auto{--bg:#fafafa;--fg:#111;--mute:#666}}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.5rem;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,sans-serif;padding:1.5rem}
+.modes{display:flex;gap:.5rem}.modes button{background:none;border:1px solid #2a2c2e;color:var(--mute);padding:.4rem 1rem;border-radius:999px;font:inherit;cursor:pointer}
+.modes button.on{border-color:var(--g);color:var(--g)}
+#t{font-size:clamp(4.5rem,22vw,9rem);font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+body.run #t{color:var(--g)}
+.ctl{display:flex;gap:.75rem}.ctl button{font:inherit;padding:.75rem 1.4rem;border-radius:12px;border:1px solid #2a2c2e;background:none;color:var(--fg);cursor:pointer;min-width:6.5rem}
+.ctl button.p{background:var(--g);border-color:var(--g);color:#06140b;font-weight:600}
+button:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+#m{color:var(--mute);text-align:center;font-size:.95rem}#m b{color:var(--fg);font-weight:500}
+</style></head><body>
+<div class="modes"><button id="mf" class="on">Foco</button><button id="mp">Pausa</button></div>
+<div id="t">25:00</div>
+<div class="ctl"><button id="go" class="p">Iniciar</button><button id="pa">Pausar</button><button id="rs">Resetar</button></div>
+<div id="m">Carregando próxima reunião…</div>
+<script>
+const D={foco:25*60,pausa:5*60};let mode='foco',left=D.foco,end=null,iv=null;const $=i=>document.getElementById(i);
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+function draw(){$('t').textContent=fmt(left);document.title=(iv?fmt(left)+' · ':'')+(mode=='foco'?'Foco':'Pausa');document.body.classList.toggle('run',!!iv);$('mf').classList.toggle('on',mode=='foco');$('mp').classList.toggle('on',mode=='pausa')}
+function tick(){left=Math.max(0,Math.round((end-Date.now())/1000));if(!left){stop();done()}draw()}
+function start(){if(iv)return;if('Notification'in window&&Notification.permission=='default')Notification.requestPermission();end=Date.now()+left*1000;iv=setInterval(tick,250);draw()}
+function stop(){clearInterval(iv);iv=null;draw()}
+function set(m){stop();mode=m;left=D[m];draw()}
+function beep(){try{const a=new AudioContext();[0,.35,.7].forEach(t=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(.3,a.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+t+.3);o.start(a.currentTime+t);o.stop(a.currentTime+t+.3)})}catch(e){}}
+async function done(){beep();navigator.vibrate&&navigator.vibrate([300,150,300]);const msg=mode=='foco'?'Foco concluído! Hora da pausa.':'Pausa acabou! Bora focar.';
+ if('Notification'in window&&Notification.permission=='granted'){try{const r=await navigator.serviceWorker?.ready;r?r.showNotification('Pomodoro',{body:msg,icon:'icon-192.png'}):new Notification('Pomodoro',{body:msg})}catch(e){}}
+ set(mode=='foco'?'pausa':'foco')}
+$('go').onclick=start;$('pa').onclick=stop;$('rs').onclick=()=>set(mode);$('mf').onclick=()=>set('foco');$('mp').onclick=()=>set('pausa');
+let EV=[];const tf=new Intl.DateTimeFormat('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}),df=new Intl.DateTimeFormat('pt-BR',{weekday:'short',day:'2-digit',timeZone:'America/Sao_Paulo'}),dk=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'});
+function showM(){const n=Date.now(),e=EV.find(x=>new Date(x.e)>n);if(!e){$('m').textContent='Nenhuma reunião próxima';return}
+ const s=new Date(e.s),now=s<=n,day=dk.format(s)==dk.format(n)?'Hoje':df.format(s);const el=$('m');el.textContent=(now?'Agora · ':'Próxima · ')+day+' '+tf.format(s)+' — ';const b=document.createElement('b');b.textContent=e.t;el.append(b)}
+async function load(){try{const r=await fetch('events.json?'+Date.now(),{cache:'no-store'});EV=(await r.json()).events.sort((a,b)=>new Date(a.s)-new Date(b.s))}catch(e){}showM()}
+load();setInterval(load,5*60e3);setInterval(showM,30e3);draw();
+'serviceWorker'in navigator&&navigator.serviceWorker.register('sw.js');
+</script></body></html>
